@@ -2,11 +2,14 @@ import User from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
+import StatusCodes from "http-status-codes";
 
 import { ResponseMessage } from "../utils/ResponseMessage.js";
 
+const activeSessions = new Map();
+
 export const registerUser = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { name, email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
@@ -22,7 +25,7 @@ export const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      username,
+      name,
       email,
       password: hashedPassword,
     });
@@ -71,7 +74,7 @@ export const loginUser = async (req, res) => {
 
     const token = jwt.sign(
       { user: { id: existingUser._id } },
-      process.env.SECRET_KEY,
+      process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
@@ -89,6 +92,33 @@ export const loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Error during user login:", error);
+    return res.status(500).json({
+      status: StatusCodes.INTERNAL_SERVER_ERROR,
+      message: ResponseMessage.INTERNAL_SERVER_ERROR,
+      data: error,
+    });
+  }
+};
+
+export const userDetails = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findById(id).select("-password");
+    if (!user) {
+      return res.status(404).json({
+        status: StatusCodes.NOT_FOUND,
+        message: ResponseMessage.USER_NOT_FOUND,
+        data: [],
+      });
+    } else {
+      return res.status(200).json({
+        status: StatusCodes.OK,
+        message: ResponseMessage.USER_DETAILES,
+        data: user,
+      });
+    }
+  } catch (error) {
+    console.log(error);
     return res.status(500).json({
       status: StatusCodes.INTERNAL_SERVER_ERROR,
       message: ResponseMessage.INTERNAL_SERVER_ERROR,
